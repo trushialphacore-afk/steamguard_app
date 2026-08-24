@@ -234,6 +234,54 @@ def _add_cumulative_savings_chart(slide, left, top, width, height, monthly_avoid
     return gframe
 
 
+def _add_trap_table(slide, left, top, width, height, trap_rows):
+    """Table identifying which specific traps keep recurring (leaking vs
+    blocked) and what each one costs per month — the thing a headline
+    aggregate number doesn't show on its own."""
+    n_rows = len(trap_rows) + 1  # + header
+    n_cols = 5
+    gframe = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
+    table = gframe.table
+    col_widths = [0.30, 0.16, 0.16, 0.16, 0.22]
+    for i, frac in enumerate(col_widths):
+        table.columns[i].width = Emu(int(width * frac))
+
+    headers = ['Trap ID', 'Leak Events', 'Block Events', 'Leak Hours', 'Est. Cost / Month (Rs)']
+    for c, h in enumerate(headers):
+        cell = table.cell(0, c)
+        cell.text = h
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = CHARCOAL
+        p = cell.text_frame.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER if c > 0 else PP_ALIGN.LEFT
+        run = p.runs[0]
+        run.font.size = Pt(12)
+        run.font.bold = True
+        run.font.color.rgb = WHITE
+
+    status_color = {'Leak': TERRACOTTA, 'Block': SAGE_GREY, 'Leak + Block': ALERT_RED, 'Other': CAPTION_GREY}
+    for r, row in enumerate(trap_rows, start=1):
+        values = [
+            row['trap_id'],
+            str(row['leak_events']),
+            str(row['block_events']),
+            f"{row['leak_hours']:.1f}",
+            _fmt_rs(row['monthly_cost_rs']),
+        ]
+        for c, val in enumerate(values):
+            cell = table.cell(r, c)
+            cell.text = val
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = WHITE if r % 2 else TILE_BG
+            p = cell.text_frame.paragraphs[0]
+            p.alignment = PP_ALIGN.CENTER if c > 0 else PP_ALIGN.LEFT
+            run = p.runs[0]
+            run.font.size = Pt(11.5)
+            run.font.color.rgb = status_color.get(row['status'], CHARCOAL) if c == 0 else CHARCOAL
+            run.font.bold = (c == 0)
+    return gframe
+
+
 def _fmt_rs(v):
     if v is None:
         return "—"
@@ -259,7 +307,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
     prs = Presentation()
     prs.slide_width = SLIDE_W
     prs.slide_height = SLIDE_H
-    total_pages = 4
+    total_pages = 5
     tile_w, gap = Inches(2.85), Inches(0.25)
 
     # ---------------- Slide 1: Overview / hero stats ----------------
@@ -361,7 +409,25 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
                   'contracted amount before sharing this deck externally.', size=11, color=ALERT_RED)
     _footer(s3, client_name, 3, total_pages)
 
-    # ---------------- Slide 4: Closing ----------------
+    # ---------------- Slide 4: Recurring problem traps ----------------
+    s4a = _blank_slide(prs)
+    _header(s4a, 'Recurring Problem Traps')
+    _textbox(s4a, Inches(0.45), Inches(1.45), Inches(12.3), Inches(0.6),
+              'Which traps keep coming back — and what each one costs', size=22, bold=True, color=CHARCOAL)
+    trap_rows = summary.get('trap_breakdown') or []
+    top_traps = trap_rows[:10]
+    if top_traps:
+        _textbox(s4a, Inches(0.45), Inches(2.05), Inches(12.3), Inches(0.5),
+                  f'Top {len(top_traps)} traps by leak hours this month, out of {summary["traps_flagged"]} traps '
+                  f'flagged — location IDs colored by fault type (terracotta = leak, grey = block, red = both).',
+                  size=13, color=SAGE_GREY)
+        _add_trap_table(s4a, Inches(0.45), Inches(2.65), Inches(12.3), Inches(4.3), top_traps)
+    else:
+        _textbox(s4a, Inches(0.45), Inches(2.5), Inches(12.3), Inches(0.6),
+                  'No individual trap events were flagged this month.', size=14, color=SAGE_GREY)
+    _footer(s4a, client_name, 4, total_pages)
+
+    # ---------------- Slide 5: Closing ----------------
     s4 = _blank_slide(prs)
     _textbox(s4, Inches(1), Inches(1.7), Inches(11.3), Inches(0.7),
               'Thank you,', size=32, bold=True, color=CHARCOAL, align=PP_ALIGN.CENTER)

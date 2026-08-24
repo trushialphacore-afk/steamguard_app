@@ -123,6 +123,18 @@ ROI_KEYWORDS = {
 }
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_fetch_all_alarms(year, month):
+    """Fetches the WHOLE tenant's alarms for one calendar month once, then
+    Streamlit reuses that result (up to an hour) for every subsequent
+    client report generated for that same month — instead of re-fetching
+    every single client's report from scratch, which was the main reason
+    report generation felt slow. Cache key is just (year, month); a fresh
+    login is done under the hood on the first call for that month."""
+    token = alphacore_api.login()
+    return alphacore_api.fetch_all_alarms_for_month(token, year, month)
+
+
 def extract_assumptions_from_roi(uploaded_file):
     """Best-effort scan of the uploaded ROI Excel (see report history for
     the two layouts this handles). Never trusted silently — results are
@@ -195,21 +207,80 @@ with step1:
     if client_name and not customer_id_known:
         st.info(
             f"🆕 First time fetching '{client_name}' — need its dashboard Customer ID once, then it's saved "
-            f"forever for this client.\n\n"
-            f"**Easiest way:** in a terminal (same window where ALPHACORE_PASS is set), run:\n\n"
-            f"`python find_customer_id.py {client_name} {target_year_month.year} {target_year_month.month}` "
-            f"(add the alarm count you see on the dashboard as a 4th argument to auto-highlight the right match) "
-            f"— it lists every client's alarm counts for that month and saves the correct ID for you when you "
-            f"pick the right one, no Network tab digging needed.\n\n"
-            f"(Alternative, more manual way: browser DevTools → Network tab → find a request to /api/v2/alarms "
-            f"→ check the customerId field.)"
+            f"forever for this client. Use the finder below — no terminal/CMD needed, works the same whether "
+            f"you're running this locally or on the deployed website."
         )
-        new_customer_id = st.text_input(f"Dashboard Customer ID for {client_name} (paste here once you have it)", key=f"cid_{client_name}")
-        if new_customer_id.strip():
-            clients_store.upsert_client(client_name, customer_id=new_customer_id.strip())
-            st.success(f"✅ Saved — '{client_name}' will auto-fetch from now on.")
-            saved_client = clients_store.get_client(client_name)
-            customer_id_known = True
+        find_col1, find_col2 = st.columns([0.6, 0.4])
+        with find_col1:
+            expected_count_str = st.text_input(
+                f"(Optional) alarm count you see for '{client_name}' on the dashboard, to auto-highlight the match",
+                key=f"expected_{client_name}",
+            )
+        with find_col2:
+            st.write("")
+            st.write("")
+            find_clicked = st.button(f"🔍 Find {client_name}'s Customer ID", key=f"find_{client_name}")
+
+        if find_clicked:
+            with st.spinner(f"Fetching {target_year_month.year}-{target_year_month.month:02d} alarms for the "
+                             f"whole tenant, so every client's Customer ID can be shown..."):
+                try:
+                    all_month_alarms = _cached_fetch_all_alarms(target_year_month.year, target_year_month.month)
+                    counts = {}
+                    for a in all_month_alarms:
+                        cid = alphacore_api.alarm_customer_id(a)
+                        counts[cid] = counts.get(cid, 0) + 1
+                    ranked = sorted(counts.items(), key=lambda x: -x[1])
+                    st.session_state[f"cid_options_{client_name}"] = ranked
+                except (alphacore_api.AlphacoreAuthError, alphacore_api.AlphacoreApiError) as e:
+                    st.error(f"Couldn't fetch alarms to find the Customer ID: {e}")
+
+        ranked = st.session_state.get(f"cid_options_{client_name}")
+        if ranked:
+            try:
+                expected_count = int(expected_count_str) if expected_count_str.strip() else None
+            except ValueError:
+                expected_count = None
+
+            def _label(item):
+                cid, count = item
+                marker = ""
+                if expected_count is not None and abs(count - expected_count) <= max(2, expected_count * 0.02):
+                    marker = "  ⭐ closest match to the count you gave"
+                return f"{count} alarms — {cid}{marker}"
+
+            options = ["(select one)"] + [_label(item) for item in ranked]
+            default_idx = 0
+            if expected_count is not None:
+                for i, (cid, count) in enumerate(ranked, start=1):
+                    if abs(count - expected_count) <= max(2, expected_count * 0.02):
+                        default_idx = i
+                        break
+            chosen_label = st.selectbox(
+                f"Found {len(ranked)} distinct customer IDs for {target_year_month.year}-{target_year_month.month:02d} "
+                f"— pick the one matching '{client_name}'",
+                options, index=default_idx, key=f"cid_select_{client_name}",
+            )
+            if chosen_label != "(select one)":
+                chosen_idx = options.index(chosen_label) - 1
+                chosen_cid = ranked[chosen_idx][0]
+                if st.button(f"✅ Save this as {client_name}'s Customer ID", key=f"save_cid_{client_name}"):
+                    clients_store.upsert_client(client_name, customer_id=chosen_cid)
+                    st.success(f"✅ Saved — '{client_name}' will auto-fetch from now on.")
+                    saved_client = clients_store.get_client(client_name)
+                    customer_id_known = True
+                    del st.session_state[f"cid_options_{client_name}"]
+                    st.rerun()
+
+        with st.expander("Or paste a Customer ID directly, if you already have it"):
+            new_customer_id = st.text_input(
+                f"Dashboard Customer ID for {client_name}", key=f"cid_manual_{client_name}"
+            )
+            if new_customer_id.strip():
+                clients_store.upsert_client(client_name, customer_id=new_customer_id.strip())
+                st.success(f"✅ Saved — '{client_name}' will auto-fetch from now on.")
+                saved_client = clients_store.get_client(client_name)
+                customer_id_known = True
 
     # Safety net for today: if the live auto-fetch isn't returning the right
     # data yet (wrong Customer ID, API quirk, etc.), you can tick this to fall
@@ -321,18 +392,6 @@ with step2:
 
 st.write("")
 generate = st.button("⚡ GENERATE REPORT", type="primary", use_container_width=True)
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def _cached_fetch_all_alarms(year, month):
-    """Fetches the WHOLE tenant's alarms for one calendar month once, then
-    Streamlit reuses that result (up to an hour) for every subsequent
-    client report generated for that same month — instead of re-fetching
-    every single client's report from scratch, which was the main reason
-    report generation felt slow. Cache key is just (year, month); a fresh
-    login is done under the hood on the first call for that month."""
-    token = alphacore_api.login()
-    return alphacore_api.fetch_all_alarms_for_month(token, year, month)
 
 
 def fetch_alarms_to_csv(client_name, year, month, tmpdir):

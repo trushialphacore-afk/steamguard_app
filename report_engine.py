@@ -863,6 +863,42 @@ def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_
         }
     avoidable_loss_30day = loss_scenarios[30]['net_loss_avoided_rs']
 
+    # ---------------- Per-trap breakdown (repeated faulty traps) ----------
+    # Sir's feedback: a slide/table identifying WHICH traps keep recurring
+    # (leaking vs blocked) and how much each one is costing per month - not
+    # just an aggregate number. Built once here so both the Excel (Trap
+    # Analysis sheet, via formulas) and the PPTX (via this plain-Python
+    # list) show the same numbers.
+    trap_breakdown = []
+    for tid in trap_ids:
+        trap_recs = [rec for rec in records if rec['trap_id'] == tid]
+        leak_ev = sum(1 for rec in trap_recs if rec['category'] == 'Leak')
+        block_ev = sum(1 for rec in trap_recs if rec['category'] == 'Block')
+        partial_h = sum(rec['duration_hours'] for rec in trap_recs if rec['sev_type'] == 'Partial')
+        full_h = sum(rec['duration_hours'] for rec in trap_recs if rec['sev_type'] == 'Full')
+        leak_h = sum(rec['duration_hours'] for rec in trap_recs if rec['category'] == 'Leak')
+        block_h = sum(rec['duration_hours'] for rec in trap_recs if rec['category'] == 'Block')
+        steam_lost_trap = partial_h * partial_rate + full_h * full_rate
+        if leak_ev > 0 and block_ev > 0:
+            status = 'Leak + Block'
+        elif leak_ev > 0:
+            status = 'Leak'
+        elif block_ev > 0:
+            status = 'Block'
+        else:
+            status = 'Other'
+        trap_breakdown.append({
+            'trap_id': tid,
+            'total_events': len(trap_recs),
+            'leak_events': leak_ev,
+            'block_events': block_ev,
+            'leak_hours': leak_h,
+            'block_hours': block_h,
+            'monthly_cost_rs': steam_lost_trap * a_cost,
+            'status': status,
+        })
+    trap_breakdown.sort(key=lambda x: (-x['leak_hours'], -x['total_events']))
+
     roi_x = None
     payback_months = None
     if a_investment_type == 'one_time':
@@ -897,6 +933,7 @@ def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_
         'loss_scenarios': loss_scenarios,
         'roi_x': roi_x,
         'payback_months': payback_months,
+        'trap_breakdown': trap_breakdown,
     }
     return out_path, summary
 
