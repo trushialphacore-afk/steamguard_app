@@ -171,6 +171,21 @@ def get_client(name):
     return load_store().get(name)
 
 
+def _clean_customer_id(raw):
+    """Someone pasting a Customer ID often actually copies the whole
+    dashboard page URL by mistake (e.g.
+    'https://alphacore.live/dashboards/all/01f76220-...') instead of just
+    the UUID at the end - a real mistake that happened with several
+    clients. The alarm API only ever returns the bare UUID, so a
+    URL-shaped value here would silently never match anything. Strip it
+    down to the last '/'-separated segment, which is the UUID either way
+    (a no-op if it was already just a plain UUID)."""
+    raw = (raw or "").strip()
+    if "/" in raw:
+        raw = raw.rstrip("/").split("/")[-1]
+    return raw
+
+
 def upsert_client(name, customer_id=None, traps_monitored=None, investment=None,
                    pressure_bar=None, orifice_mm=None, cost_per_ton=None, detect_minutes=None):
     """
@@ -182,7 +197,7 @@ def upsert_client(name, customer_id=None, traps_monitored=None, investment=None,
     store = load_store()
     entry = store.get(name, {})
     if customer_id is not None:
-        entry["customer_id"] = customer_id
+        entry["customer_id"] = _clean_customer_id(customer_id)
     if traps_monitored is not None:
         entry["traps_monitored"] = traps_monitored
     if investment is not None:
