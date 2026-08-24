@@ -239,14 +239,14 @@ def _add_trap_table(slide, left, top, width, height, trap_rows):
     blocked) and what each one costs per month — the thing a headline
     aggregate number doesn't show on its own."""
     n_rows = len(trap_rows) + 1  # + header
-    n_cols = 5
+    n_cols = 6
     gframe = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
     table = gframe.table
-    col_widths = [0.30, 0.16, 0.16, 0.16, 0.22]
+    col_widths = [0.24, 0.13, 0.13, 0.14, 0.16, 0.20]
     for i, frac in enumerate(col_widths):
         table.columns[i].width = Emu(int(width * frac))
 
-    headers = ['Trap ID', 'Leak Events', 'Block Events', 'Leak Hours', 'Est. Cost / Month (Rs)']
+    headers = ['Trap ID', 'Leak Events', 'Block Events', 'Leak Hours', 'Steam Loss (Tons)', 'Est. Cost / Month (Rs)']
     for c, h in enumerate(headers):
         cell = table.cell(0, c)
         cell.text = h
@@ -266,6 +266,7 @@ def _add_trap_table(slide, left, top, width, height, trap_rows):
             str(row['leak_events']),
             str(row['block_events']),
             f"{row['leak_hours']:.1f}",
+            f"{row['steam_lost_tons']:.3f}",
             _fmt_rs(row['monthly_cost_rs']),
         ]
         for c, val in enumerate(values):
