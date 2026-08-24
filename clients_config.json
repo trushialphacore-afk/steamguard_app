@@ -2,7 +2,11 @@
   "GSP": {
     "customer_id": "3fe9a6a0-dcd4-11f0-b708-e5039c453036",
     "traps_monitored": 25,
-    "investment": 564400.0
+    "investment": 564400.0,
+    "pressure_bar": 10.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2200.0,
+    "detect_minutes": 15.0
   },
   "BKT": {
     "customer_id": "f0e19830-ba03-11f0-9333-67f47b798878",
