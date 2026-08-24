@@ -894,6 +894,7 @@ def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_
             'block_events': block_ev,
             'leak_hours': leak_h,
             'block_hours': block_h,
+            'steam_lost_tons': steam_lost_trap,
             'monthly_cost_rs': steam_lost_trap * a_cost,
             'status': status,
         })
