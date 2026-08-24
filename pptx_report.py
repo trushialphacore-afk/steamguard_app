@@ -414,17 +414,24 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
     _header(s4a, 'Recurring Problem Traps')
     _textbox(s4a, Inches(0.45), Inches(1.45), Inches(12.3), Inches(0.6),
               'Which traps keep coming back — and what each one costs', size=22, bold=True, color=CHARCOAL)
+    # Only genuinely recurring/serious traps make this slide — a trap that
+    # logged a couple of minutes of leak time isn't worth putting in front
+    # of management, so this is filtered by a leak-hours threshold rather
+    # than just "top 10 regardless of how small the numbers are".
+    LEAK_HOURS_THRESHOLD = 10
     trap_rows = summary.get('trap_breakdown') or []
-    top_traps = trap_rows[:10]
+    top_traps = [t for t in trap_rows if t['leak_hours'] > LEAK_HOURS_THRESHOLD][:12]
     if top_traps:
         _textbox(s4a, Inches(0.45), Inches(2.05), Inches(12.3), Inches(0.5),
-                  f'Top {len(top_traps)} traps by leak hours this month, out of {summary["traps_flagged"]} traps '
-                  f'flagged — location IDs colored by fault type (terracotta = leak, grey = block, red = both).',
+                  f'{len(top_traps)} traps with more than {LEAK_HOURS_THRESHOLD} leak hours this month, out of '
+                  f'{summary["traps_flagged"]} traps flagged — location IDs colored by fault type '
+                  f'(terracotta = leak, grey = block, red = both).',
                   size=13, color=SAGE_GREY)
         _add_trap_table(s4a, Inches(0.45), Inches(2.65), Inches(12.3), Inches(4.3), top_traps)
     else:
         _textbox(s4a, Inches(0.45), Inches(2.5), Inches(12.3), Inches(0.6),
-                  'No individual trap events were flagged this month.', size=14, color=SAGE_GREY)
+                  f'No trap logged more than {LEAK_HOURS_THRESHOLD} leak hours this month.',
+                  size=14, color=SAGE_GREY)
     _footer(s4a, client_name, 4, total_pages)
 
     # ---------------- Slide 5: Closing ----------------
