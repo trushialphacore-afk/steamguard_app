@@ -84,7 +84,11 @@
   "Amneal_Matoda": {
     "customer_id": "17bf2510-0588-11f1-a045-799393f7b056",
     "traps_monitored": 30,
-    "investment": 602000.0
+    "investment": 602000.0,
+    "pressure_bar": 8.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 3450.0,
+    "detect_minutes": 15.0
   },
   "Amneal_Palli": {
     "customer_id": "2414b160-9c62-11f1-956d-95128823b24b"
