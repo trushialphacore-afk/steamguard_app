@@ -12,13 +12,67 @@ the alphacore.live "Alarms" table instead, the column names will be
 different — see convert_dashboard_export() in app.py for that path.
 """
 
-import openpyxl, datetime, csv, re
+import openpyxl, datetime, csv, re, os, shutil, subprocess, tempfile
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, PieChart, LineChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.marker import DataPoint
+
+
+def _recalculate_with_libreoffice(xlsx_path, timeout=60):
+    """
+    openpyxl only WRITES formulas - it never calculates them, so the cells
+    have no cached value until something opens the file and calculates it.
+    Excel normally does this itself on open (this workbook already sets
+    fullCalcOnLoad), but a lot of real-world viewing paths DON'T calculate
+    on open - a browser/Drive/quick-look preview pane, some mobile Excel
+    viewers, or Excel set to manual calculation - and in those cases the
+    workbook looks completely blank even though every number is correct
+    underneath.
+
+    This bakes the real calculated values into the file server-side, right
+    after it's built, using a headless LibreOffice pass - so it opens
+    correctly showing real numbers in ANY viewer, not just a desktop Excel
+    with automatic calculation.
+
+    Silently does nothing (workbook still has correct formulas, just no
+    baked-in cache) if LibreOffice isn't installed wherever this is
+    running - e.g. a local dev machine without it. On Streamlit Cloud this
+    needs `libreoffice-calc` listed in packages.txt at the repo root, or
+    this quietly no-ops and the file falls back to relying on Excel's own
+    on-open calculation (Ctrl+Alt+F9 if that ever doesn't kick in).
+    """
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        return False
+    profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
+    # Converting "in place" (--outdir == the source file's own directory)
+    # makes LibreOffice try to overwrite the exact file it's reading from,
+    # which fails outright (SfxBaseModel::impl_store write error) rather
+    # than silently no-op-ing - confirmed by testing. Converting into a
+    # separate temp directory and then swapping the result into place
+    # avoids that entirely.
+    convert_out_dir = tempfile.mkdtemp(prefix="lo_out_")
+    try:
+        subprocess.run(
+            [soffice, "--headless", "--norestore",
+             f"-env:UserInstallation=file://{profile_dir}",
+             "--convert-to", "xlsx", "--outdir", convert_out_dir, xlsx_path],
+            check=True, timeout=timeout,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        converted_path = os.path.join(convert_out_dir, os.path.basename(xlsx_path))
+        if os.path.exists(converted_path) and os.path.getsize(converted_path) > 0:
+            shutil.move(converted_path, xlsx_path)
+            return True
+        return False
+    except Exception:
+        return False
+    finally:
+        shutil.rmtree(profile_dir, ignore_errors=True)
+        shutil.rmtree(convert_out_dir, ignore_errors=True)
 
 # Brand palette (same colors used in the PPTX — NAVY/BLUE/LIGHT_BLUE) plus a
 # warm accent for "Block" events, used to make the Management_View charts
@@ -832,6 +886,9 @@ def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_
                                       color=f.color, underline=f.underline)
 
     wb.save(out_path)
+    # Bake in real calculated values (see docstring above) so the workbook
+    # doesn't look blank in viewers that don't calculate formulas on open.
+    _recalculate_with_libreoffice(out_path)
 
     # ---------------- Plain-Python KPI values (mirrors the Excel formulas
     # above) so callers (e.g. the PPTX management-report generator) can get
