@@ -353,42 +353,44 @@ with step2:
         try:
             detected = extract_assumptions_from_roi(roi_file)
         except Exception as e:
-            st.warning(f"Couldn't auto-read the ROI sheet ({e}) — using defaults below. "
-                       "You can still set values manually in Advanced.")
+            st.warning(f"Couldn't auto-read the ROI sheet ({e}) — using saved/default values below. "
+                       "You can still correct them manually in the fields below.")
 
     # Precedence: freshly-uploaded ROI sheet (detected) > previously-saved
     # values for this client (saved_roi) > hardcoded defaults.
     assumption_values = {**DEFAULTS, **saved_roi, **detected}
 
-    if roi_file is not None:
-        st.markdown("**📋 Assumptions detected from the ROI sheet:**")
-        rows = []
-        for key, label in [
-            ("pressure_bar", "Steam header pressure (bar)"),
-            ("orifice_mm", "Orifice diameter (mm)"),
-            ("cost_per_ton", "Cost per ton of steam (Rs)"),
-        ]:
-            source = "from ROI sheet" if key in detected else (
-                "saved from before" if key in saved_roi else "default (not found in sheet)")
-            rows.append({"Assumption": label, "Value": assumption_values[key], "Source": source})
-        st.table(pd.DataFrame(rows))
-        detectable_keys = ["pressure_bar", "orifice_mm", "cost_per_ton"]
-        if sum(1 for k in detectable_keys if k in detected) < len(detectable_keys):
-            st.caption("Some values weren't found in the ROI sheet and are using saved/default values — "
-                       "open Advanced below to correct them if needed.")
+    if roi_file is not None and detected:
+        st.caption("📋 Values below were auto-filled from the uploaded ROI sheet — double check them, "
+                   "then Generate to save them for this client.")
     elif has_saved_roi:
-        st.caption("📋 Using the saved assumptions shown in Advanced below (from this client's last ROI sheet).")
+        st.caption("📋 Values below are auto-filled from what was saved for this client last time.")
 
-    with st.expander("⚙️ Advanced: edit assumptions manually"):
-        a1, a2 = st.columns(2)
-        with a1:
-            pressure = st.number_input("Steam header pressure (bar)", value=assumption_values["pressure_bar"], step=0.5)
-            orifice = st.number_input("Orifice diameter (mm)", value=assumption_values["orifice_mm"], step=0.5)
-        with a2:
-            cost_per_ton = st.number_input("Cost per ton of steam (Rs)", value=assumption_values["cost_per_ton"], step=100.0)
-        # SteamGuard detection time is used internally (Loss_Projection sheet's
-        # residual-loss calc) but is intentionally not shown anywhere in the UI.
-        detect_min = assumption_values["detect_minutes"]
+    # ---------------- ROI assumptions — same visible/auto-filled pattern as
+    # Investment and Traps Monitored above (not tucked in an "Advanced"
+    # expander), so they're just as easy to spot and confirm at a glance. ----
+    a1, a2, a3 = st.columns(3)
+    with a1:
+        pressure = st.number_input(
+            "🌡️ Steam header pressure (bar)", value=float(assumption_values["pressure_bar"]), step=0.5,
+            help="From the client's ROI sheet. Saved automatically once you generate a report for this "
+                 "client — auto-fills next time.",
+        )
+    with a2:
+        orifice = st.number_input(
+            "⭕ Orifice diameter (mm)", value=float(assumption_values["orifice_mm"]), step=0.5,
+            help="From the client's ROI sheet. Saved automatically once you generate a report for this "
+                 "client — auto-fills next time.",
+        )
+    with a3:
+        cost_per_ton = st.number_input(
+            "🔥 Cost per ton of steam (Rs)", value=float(assumption_values["cost_per_ton"]), step=100.0,
+            help="From the client's ROI sheet. Saved automatically once you generate a report for this "
+                 "client — auto-fills next time.",
+        )
+    # SteamGuard detection time is used internally (Loss_Projection sheet's
+    # residual-loss calc) but is intentionally not shown anywhere in the UI.
+    detect_min = assumption_values["detect_minutes"]
 
 st.write("")
 generate = st.button("⚡ GENERATE REPORT", type="primary", use_container_width=True)
