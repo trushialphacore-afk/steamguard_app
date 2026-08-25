@@ -96,6 +96,10 @@
   "CEAT_Bhandup": {
     "customer_id": "e67073e0-d681-11f0-acf0-9dc39bd2429d",
     "traps_monitored": 50,
-    "investment": 979500.0
+    "investment": 979500.0,
+    "pressure_bar": 17.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 3300.0,
+    "detect_minutes": 15.0
   }
 }
