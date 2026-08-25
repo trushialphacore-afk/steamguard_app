@@ -66,7 +66,11 @@
   "Alkem": {
     "customer_id": "166ab790-d583-11f0-acf0-9dc39bd2429d",
     "traps_monitored": 25,
-    "investment": 478000.0
+    "investment": 478000.0,
+    "pressure_bar": 8.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2400.0,
+    "detect_minutes": 15.0
   },
   "ipca": {
     "customer_id": "ee556290-0021-11f1-a045-799393f7b056",
