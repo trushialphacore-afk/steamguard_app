@@ -197,30 +197,24 @@ with step1:
     target_year_month = datetime.datetime.strptime(month_label, "%B %Y")
     filter_year_month = (target_year_month.year, target_year_month.month)
 
-    # Alarm data is always auto-fetched from the dashboard for the selected
-    # client + month — no file upload needed. The one thing this needs that
-    # can't be auto-discovered (the dashboard account doesn't have permission
-    # to list all customers) is this client's dashboard Customer ID. Once
-    # that's entered here for a client, it's saved and never needs re-entering.
-    saved_client = clients_store.get_client(client_name) if client_name else None
-    customer_id_known = bool((saved_client or {}).get("customer_id"))
-    if client_name and not customer_id_known:
-        st.info(
-            f"🆕 First time fetching '{client_name}' — need its dashboard Customer ID once, then it's saved "
-            f"forever for this client. Use the finder below — no terminal/CMD needed, works the same whether "
-            f"you're running this locally or on the deployed website."
-        )
+    def _render_customer_id_finder(client_name, target_year_month, key_suffix=""):
+        """Renders the whole 'find + save Customer ID' flow — used both for
+        a brand-new client (no ID saved yet) and, in a collapsed expander,
+        to let an existing client's ID be corrected if it turns out to be
+        wrong (e.g. '0 alarms returned' — the saved ID doesn't match this
+        client). No CMD/terminal needed either way."""
         find_col1, find_col2 = st.columns([0.6, 0.4])
         with find_col1:
             expected_count_str = st.text_input(
                 f"(Optional) alarm count you see for '{client_name}' on the dashboard, to auto-highlight the match",
-                key=f"expected_{client_name}",
+                key=f"expected_{client_name}{key_suffix}",
             )
         with find_col2:
             st.write("")
             st.write("")
-            find_clicked = st.button(f"🔍 Find {client_name}'s Customer ID", key=f"find_{client_name}")
+            find_clicked = st.button(f"🔍 Find {client_name}'s Customer ID", key=f"find_{client_name}{key_suffix}")
 
+        state_key = f"cid_options_{client_name}{key_suffix}"
         if find_clicked:
             with st.spinner(f"Fetching {target_year_month.year}-{target_year_month.month:02d} alarms for the "
                              f"whole tenant, so every client's Customer ID can be shown..."):
@@ -231,11 +225,11 @@ with step1:
                         cid = alphacore_api.alarm_customer_id(a)
                         counts[cid] = counts.get(cid, 0) + 1
                     ranked = sorted(counts.items(), key=lambda x: -x[1])
-                    st.session_state[f"cid_options_{client_name}"] = ranked
+                    st.session_state[state_key] = ranked
                 except (alphacore_api.AlphacoreAuthError, alphacore_api.AlphacoreApiError) as e:
                     st.error(f"Couldn't fetch alarms to find the Customer ID: {e}")
 
-        ranked = st.session_state.get(f"cid_options_{client_name}")
+        ranked = st.session_state.get(state_key)
         if ranked:
             try:
                 expected_count = int(expected_count_str) if expected_count_str.strip() else None
@@ -259,28 +253,47 @@ with step1:
             chosen_label = st.selectbox(
                 f"Found {len(ranked)} distinct customer IDs for {target_year_month.year}-{target_year_month.month:02d} "
                 f"— pick the one matching '{client_name}'",
-                options, index=default_idx, key=f"cid_select_{client_name}",
+                options, index=default_idx, key=f"cid_select_{client_name}{key_suffix}",
             )
             if chosen_label != "(select one)":
                 chosen_idx = options.index(chosen_label) - 1
                 chosen_cid = ranked[chosen_idx][0]
-                if st.button(f"✅ Save this as {client_name}'s Customer ID", key=f"save_cid_{client_name}"):
+                if st.button(f"✅ Save this as {client_name}'s Customer ID", key=f"save_cid_{client_name}{key_suffix}"):
                     clients_store.upsert_client(client_name, customer_id=chosen_cid)
                     st.success(f"✅ Saved — '{client_name}' will auto-fetch from now on.")
-                    saved_client = clients_store.get_client(client_name)
-                    customer_id_known = True
-                    del st.session_state[f"cid_options_{client_name}"]
+                    del st.session_state[state_key]
                     st.rerun()
 
         with st.expander("Or paste a Customer ID directly, if you already have it"):
             new_customer_id = st.text_input(
-                f"Dashboard Customer ID for {client_name}", key=f"cid_manual_{client_name}"
+                f"Dashboard Customer ID for {client_name}", key=f"cid_manual_{client_name}{key_suffix}"
             )
             if new_customer_id.strip():
                 clients_store.upsert_client(client_name, customer_id=new_customer_id.strip())
                 st.success(f"✅ Saved — '{client_name}' will auto-fetch from now on.")
-                saved_client = clients_store.get_client(client_name)
-                customer_id_known = True
+                st.rerun()
+
+    # Alarm data is always auto-fetched from the dashboard for the selected
+    # client + month — no file upload needed. The one thing this needs that
+    # can't be auto-discovered (the dashboard account doesn't have permission
+    # to list all customers) is this client's dashboard Customer ID. Once
+    # that's entered here for a client, it's saved and never needs re-entering.
+    saved_client = clients_store.get_client(client_name) if client_name else None
+    customer_id_known = bool((saved_client or {}).get("customer_id"))
+    if client_name and not customer_id_known:
+        st.info(
+            f"🆕 First time fetching '{client_name}' — need its dashboard Customer ID once, then it's saved "
+            f"forever for this client. Use the finder below — no terminal/CMD needed, works the same whether "
+            f"you're running this locally or on the deployed website."
+        )
+        _render_customer_id_finder(client_name, target_year_month)
+    elif client_name:
+        # Already has a saved ID, but it might be the WRONG one (e.g. the
+        # dashboard fetch below comes back with 0 alarms) — this stays
+        # available, collapsed, so it can be corrected without any CMD/
+        # terminal step, same as the first-time flow above.
+        with st.expander(f"🔁 Getting 0 alarms for '{client_name}'? Fix its saved Customer ID here"):
+            _render_customer_id_finder(client_name, target_year_month, key_suffix="_fix")
 
     # Safety net for today: if the live auto-fetch isn't returning the right
     # data yet (wrong Customer ID, API quirk, etc.), you can tick this to fall
@@ -410,11 +423,10 @@ def fetch_alarms_to_csv(client_name, year, month, tmpdir):
     if not alarms:
         raise ValueError(
             f"The dashboard returned 0 alarms for {client_name} in {year}-{month:02d} — the saved "
-            f"Customer ID for '{client_name}' is almost certainly wrong (this happened with GSP too). "
-            f"Fix it by running, in a terminal:  "
-            f"python find_customer_id.py {client_name} {year} {month}  "
-            f"— it lists every client's real alarm counts for that month so you can pick the correct one "
-            f"and it saves it automatically. Then just click GENERATE REPORT again."
+            f"Customer ID for '{client_name}' is almost certainly wrong (this has happened before with a "
+            f"couple of clients). Fix it right here — scroll up to '1. Client & month' and open "
+            f"'🔁 Getting 0 alarms for {client_name}'? Fix its saved Customer ID here', pick the correct one, "
+            f"then click GENERATE REPORT again. No terminal/CMD needed."
         )
     rows = [alphacore_api.flatten(a) for a in alarms]
     all_keys = []
