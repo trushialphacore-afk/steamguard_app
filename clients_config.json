@@ -16,7 +16,11 @@
   "JK_Tyres": {
     "customer_id": "04df6850-070f-11f1-a045-799393f7b056",
     "investment": 312500.0,
-    "traps_monitored": 14
+    "traps_monitored": 14,
+    "pressure_bar": 20.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 1800.0,
+    "detect_minutes": 15.0
   },
   "HIKAL": {
     "customer_id": "01f76220-13c9-11f1-b569-751e59363cb7",
