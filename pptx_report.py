@@ -234,24 +234,43 @@ def _add_cumulative_savings_chart(slide, left, top, width, height, monthly_avoid
     return gframe
 
 
-def _add_trap_table(slide, left, top, width, height, trap_rows):
+def _add_trap_table(slide, left, top, width, max_height, trap_rows):
     """Table identifying which specific traps keep recurring (leaking vs
     blocked) and what each one costs per month — the thing a headline
-    aggregate number doesn't show on its own."""
+    aggregate number doesn't show on its own. Fault type gets its own
+    plain-text 'Status' column (not just a color) so it reads unambiguously
+    without needing a color-key legend.
+
+    Row heights are fixed (not the whole table stretched to fill
+    max_height) — with python-pptx, a table's total height gets divided
+    evenly across however many rows it has, so with only 1-2 qualifying
+    traps that made the header and data rows balloon to ~2in each. Fixing
+    the per-row height keeps it readable regardless of row count."""
+    HEADER_H = Inches(0.45)
+    ROW_H = Inches(0.5)
     n_rows = len(trap_rows) + 1  # + header
-    n_cols = 6
-    gframe = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
+    n_cols = 7
+    table_h = min(max_height, HEADER_H + ROW_H * len(trap_rows))
+    gframe = slide.shapes.add_table(n_rows, n_cols, left, top, width, table_h)
     table = gframe.table
-    col_widths = [0.24, 0.13, 0.13, 0.14, 0.16, 0.20]
+    table.rows[0].height = HEADER_H
+    for r in range(1, n_rows):
+        table.rows[r].height = ROW_H
+
+    col_widths = [0.22, 0.14, 0.11, 0.11, 0.12, 0.14, 0.16]
     for i, frac in enumerate(col_widths):
         table.columns[i].width = Emu(int(width * frac))
 
-    headers = ['Trap ID', 'Leak Events', 'Block Events', 'Leak Hours', 'Steam Loss (Tons)', 'Est. Cost / Month (Rs)']
+    headers = ['Trap ID', 'Status', 'Leak Events', 'Block Events', 'Leak Hours',
+               'Steam Loss (Tons)', 'Est. Cost / Month (Rs)']
     for c, h in enumerate(headers):
         cell = table.cell(0, c)
         cell.text = h
         cell.fill.solid()
         cell.fill.fore_color.rgb = CHARCOAL
+        cell.margin_top = Pt(2)
+        cell.margin_bottom = Pt(2)
+        cell.vertical_anchor = MSO_ANCHOR.MIDDLE
         p = cell.text_frame.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER if c > 0 else PP_ALIGN.LEFT
         run = p.runs[0]
@@ -260,9 +279,12 @@ def _add_trap_table(slide, left, top, width, height, trap_rows):
         run.font.color.rgb = WHITE
 
     status_color = {'Leak': TERRACOTTA, 'Block': SAGE_GREY, 'Leak + Block': ALERT_RED, 'Other': CAPTION_GREY}
+    status_label = {'Leak': 'Leak', 'Block': 'Block', 'Leak + Block': 'Leak + Block', 'Other': 'Other'}
     for r, row in enumerate(trap_rows, start=1):
+        status = row['status']
         values = [
             row['trap_id'],
+            status_label.get(status, status),
             str(row['leak_events']),
             str(row['block_events']),
             f"{row['leak_hours']:.1f}",
@@ -272,14 +294,21 @@ def _add_trap_table(slide, left, top, width, height, trap_rows):
         for c, val in enumerate(values):
             cell = table.cell(r, c)
             cell.text = val
+            cell.margin_top = Pt(2)
+            cell.margin_bottom = Pt(2)
+            cell.vertical_anchor = MSO_ANCHOR.MIDDLE
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if r % 2 else TILE_BG
             p = cell.text_frame.paragraphs[0]
             p.alignment = PP_ALIGN.CENTER if c > 0 else PP_ALIGN.LEFT
             run = p.runs[0]
             run.font.size = Pt(11.5)
-            run.font.color.rgb = status_color.get(row['status'], CHARCOAL) if c == 0 else CHARCOAL
-            run.font.bold = (c == 0)
+            if c == 1:
+                run.font.color.rgb = status_color.get(status, CHARCOAL)
+                run.font.bold = True
+            else:
+                run.font.color.rgb = CHARCOAL
+                run.font.bold = (c == 0)
     return gframe
 
 
@@ -341,6 +370,15 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
               f'Healthy traps: {summary["healthy_traps"]}', size=13, color=CHARCOAL)
     _add_event_mix_pie(s1, Inches(7.1), Inches(5.15), Inches(5.2), Inches(1.85),
                         summary['leak_events'], summary['block_events'])
+    if summary['leak_events'] == 0 and summary['block_events'] > 0:
+        # A month where every flagged event was a blockage, not a leak, is
+        # a real and useful finding on its own — but the steam-loss/cost
+        # slides that follow will show all-zero numbers, which can read as
+        # "the tool is broken" if it isn't called out explicitly.
+        _textbox(s1, Inches(0.45), Inches(6.55), Inches(12.3), Inches(0.45),
+                  'ℹ No leak events this month — only blockages, which carry no steam-loss cost under this '
+                  'model (the maintenance action needed is different: clear the blockage, not seal a leak).',
+                  size=11, color=SAGE_GREY)
     _footer(s1, client_name, 1, total_pages)
 
     # ---------------- Slide 2: Detection & cost impact ----------------
@@ -348,10 +386,13 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
     _header(s2, 'Detection & Cost Impact')
     _textbox(s2, Inches(0.45), Inches(1.45), Inches(12.3), Inches(0.6),
               'Steam lost, valued and projected', size=24, bold=True, color=CHARCOAL)
-    _textbox(s2, Inches(0.45), Inches(2.1), Inches(12.3), Inches(0.6),
-              f'Steam lost this month is valued at {_fmt_rs(summary["steam_lost_tons"] * summary["cost_per_ton"])} '
-              f'at ₹{summary["cost_per_ton"]:,.0f}/tonne — projected to '
-              f'{_fmt_rs(summary["annual_steam_value_rs"])} a year at this run-rate.', size=14, color=CHARCOAL)
+    if summary['leak_hours'] == 0:
+        cost_note = 'No leak-type events this month (only blockages, if any) — steam-loss cost is ₹0.'
+    else:
+        cost_note = (f'Steam lost this month is valued at {_fmt_rs(summary["steam_lost_tons"] * summary["cost_per_ton"])} '
+                     f'at ₹{summary["cost_per_ton"]:,.0f}/tonne — projected to '
+                     f'{_fmt_rs(summary["annual_steam_value_rs"])} a year at this run-rate.')
+    _textbox(s2, Inches(0.45), Inches(2.1), Inches(12.3), Inches(0.6), cost_note, size=14, color=CHARCOAL)
 
     tiles2 = [
         (f'{summary["steam_lost_tons"]:.2f} T', 'steam lost this month'),
@@ -425,8 +466,8 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
     if top_traps:
         _textbox(s4a, Inches(0.45), Inches(2.05), Inches(12.3), Inches(0.5),
                   f'{len(top_traps)} traps with more than {LEAK_HOURS_THRESHOLD} leak hours this month, out of '
-                  f'{summary["traps_flagged"]} traps flagged — location IDs colored by fault type '
-                  f'(terracotta = leak, grey = block, red = both).',
+                  f'{summary["traps_flagged"]} traps flagged — see the Status column for whether each one is '
+                  f'leaking, blocked, or both.',
                   size=13, color=SAGE_GREY)
         _add_trap_table(s4a, Inches(0.45), Inches(2.65), Inches(12.3), Inches(4.3), top_traps)
     else:
