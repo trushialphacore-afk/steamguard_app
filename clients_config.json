@@ -29,7 +29,11 @@
   "HIKAL": {
     "customer_id": "fae71a20-2845-11f1-bdf6-73915c8eb520",
     "traps_monitored": 5,
-    "investment": 145500.0
+    "investment": 145500.0,
+    "pressure_bar": 10.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2200.0,
+    "detect_minutes": 15.0
   },
   "Rallis": {
     "customer_id": "b3e9c650-1b97-11f1-bdf6-73915c8eb520",
