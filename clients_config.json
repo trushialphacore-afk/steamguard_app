@@ -38,7 +38,11 @@
   "Rallis": {
     "customer_id": "74ecc170-3715-11f1-ba60-83caa49008ef",
     "traps_monitored": 4,
-    "investment": 129000.0
+    "investment": 129000.0,
+    "pressure_bar": 4.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2600.0,
+    "detect_minutes": 15.0
   },
   "SRF": {
     "customer_id": "34a36b50-899a-11f1-956d-95128823b24b",
