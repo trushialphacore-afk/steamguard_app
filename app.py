@@ -319,18 +319,15 @@ with step2:
     has_saved_roi = bool(saved_roi)
 
     if has_saved_roi:
-        st.success(
-            f"✅ Using saved ROI assumptions for **{client_name}** from a previous report "
-            f"(no need to re-upload the ROI sheet). Upload it below only if the numbers changed."
-        )
-        roi_file = st.file_uploader(
-            "Client's ROI Excel (optional — already saved for this client)", type=["xlsx", "xls"]
-        )
+        st.caption(f"✅ Using saved ROI assumptions for **{client_name}** — no upload needed.")
+        with st.expander("📄 Upload a new ROI sheet for this client (only if the numbers changed)"):
+            roi_file = st.file_uploader("Client's ROI Excel", type=["xlsx", "xls"], key=f"roi_{client_name}")
     else:
-        roi_file = st.file_uploader(
-            "Client's ROI Excel (first time for this client — will be saved automatically)",
-            type=["xlsx", "xls"],
-        )
+        with st.expander(f"📄 Upload {client_name or 'new client'}'s ROI sheet (optional — or just fill the fields below by hand)"):
+            roi_file = st.file_uploader(
+                "Client's ROI Excel — will be read automatically and saved for this client",
+                type=["xlsx", "xls"], key=f"roi_{client_name}",
+            )
 
     # ---------------- Investment + Traps monitored ----------------
     col_inv, col_traps = st.columns(2)
