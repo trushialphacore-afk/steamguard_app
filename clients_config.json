@@ -11,7 +11,11 @@
   "BKT": {
     "customer_id": "f0e19830-ba03-11f0-9333-67f47b798878",
     "traps_monitored": 4,
-    "investment": 92500.0
+    "investment": 92500.0,
+    "pressure_bar": 13.5,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2200.0,
+    "detect_minutes": 15.0
   },
   "JK_Tyres": {
     "customer_id": "04df6850-070f-11f1-a045-799393f7b056",
