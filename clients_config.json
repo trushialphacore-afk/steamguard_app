@@ -75,7 +75,11 @@
   "ipca": {
     "customer_id": "0b6eaf40-0021-11f1-a045-799393f7b056",
     "traps_monitored": 10,
-    "investment": 213000.0
+    "investment": 213000.0,
+    "pressure_bar": 3.5,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2000.0,
+    "detect_minutes": 15.0
   },
   "Amneal_Matoda": {
     "customer_id": "80456100-01a8-11f1-a045-799393f7b056",
