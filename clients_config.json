@@ -52,7 +52,11 @@
   "Marico_Jalgaon": {
     "customer_id": "27adca80-d26b-11f0-b405-934623983d4a",
     "traps_monitored": 5,
-    "investment": 119000.0
+    "investment": 119000.0,
+    "pressure_bar": 4.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 1400.0,
+    "detect_minutes": 15.0
   },
   "Apollo": {
     "customer_id": "01d86630-d293-11f0-acf0-9dc39bd2429d",
