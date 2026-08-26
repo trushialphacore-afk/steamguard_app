@@ -320,7 +320,7 @@ def _fmt_rs(v):
     return f"₹{v:,.0f}"
 
 
-def build_pptx_report(summary, month_label, out_path, investment_confirmed=True, maintenance_notes=None):
+def build_pptx_report(summary, month_label, out_path, investment_confirmed=True):
     """
     summary: the dict returned by report_engine.build_report()'s second
         return value — this function reads it directly, so it always
@@ -332,18 +332,12 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
         placeholder/default rather than a confirmed client value — a
         caption is added to the ROI slide flagging that so a management
         deck never silently shows an unverified number as fact.
-    maintenance_notes: optional free-text string describing any maintenance
-        or improvement work done this month (e.g. trap replacements,
-        blockages cleared). Typed fresh per report — when given, an extra
-        slide is inserted before the closing slide; when empty/None, no
-        extra slide is added and the deck stays exactly as before.
     """
     client_name = summary['client_name']
-    has_notes = bool(maintenance_notes and maintenance_notes.strip())
     prs = Presentation()
     prs.slide_width = SLIDE_W
     prs.slide_height = SLIDE_H
-    total_pages = 6 if has_notes else 5
+    total_pages = 5
     tile_w, gap = Inches(2.85), Inches(0.25)
 
     # ---------------- Slide 1: Overview / hero stats ----------------
@@ -482,35 +476,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
                   size=14, color=SAGE_GREY)
     _footer(s4a, client_name, 4, total_pages)
 
-    # ---------------- Slide 5 (optional): Maintenance / improvement actions ----------------
-    # Only added when there's actually something to show this month — a
-    # month with nothing typed in the box gets no extra slide, so the deck
-    # stays exactly as it always has for a routine month.
-    if has_notes:
-        s5 = _blank_slide(prs)
-        _header(s5, 'Maintenance & Improvement Actions')
-        _textbox(s5, Inches(0.45), Inches(1.45), Inches(12.3), Inches(0.6),
-                  f'What was done this month — {month_label}', size=24, bold=True, color=CHARCOAL)
-        _textbox(s5, Inches(0.45), Inches(2.1), Inches(12.3), Inches(0.5),
-                  'Maintenance, repairs, or improvement actions carried out on the traps above, as logged '
-                  'by the field/plant team.', size=13, color=SAGE_GREY)
-
-        notes_box = s5.shapes.add_textbox(Inches(0.45), Inches(2.75), Inches(12.3), Inches(4.0))
-        tf = notes_box.text_frame
-        tf.word_wrap = True
-        lines = [ln.strip() for ln in maintenance_notes.strip().splitlines() if ln.strip()]
-        for i, line in enumerate(lines):
-            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-            p.alignment = PP_ALIGN.LEFT
-            p.space_after = Pt(10)
-            run = p.add_run()
-            run.text = f'•  {line}'
-            run.font.size = Pt(15)
-            run.font.color.rgb = CHARCOAL
-            run.font.name = 'Arial'
-        _footer(s5, client_name, 5, total_pages)
-
-    # ---------------- Slide 6 (or 5): Closing ----------------
+    # ---------------- Slide 5: Closing ----------------
     s4 = _blank_slide(prs)
     _textbox(s4, Inches(1), Inches(1.7), Inches(11.3), Inches(0.7),
               'Thank you,', size=32, bold=True, color=CHARCOAL, align=PP_ALIGN.CENTER)
