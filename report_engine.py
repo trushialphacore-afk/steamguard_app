@@ -243,17 +243,9 @@ def validate_csv_columns(csv_path):
         )
 
 
-def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_month=None,
-                  maintenance_notes=None):
+def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_month=None):
     """
     Build the 8-sheet SteamGuard workbook for one client/month.
-
-    maintenance_notes: optional free-text string — whatever maintenance or
-        improvement work was done this month (e.g. "Trap #1331 replaced —
-        leak resolved."). Typed fresh each report (month-specific, not
-        saved per-client like investment/traps), and written into a small
-        section on Management_View if given. Also passed straight through
-        to build_pptx_report() by the caller so it shows on the PPT too.
 
     assumptions: optional dict, any subset of:
         pressure_bar        (default 14)
@@ -860,22 +852,6 @@ def build_report(client_name, csv_path, out_path, assumptions=None, filter_year_
     line1.x_axis.delete = False
     line1.y_axis.delete = False
     mv.add_chart(line1, 'A81')
-
-    # ---------------- Maintenance / Improvement Actions (optional) ----------
-    # Placed in column J, well clear of the A-column charts anchored at
-    # A18/A39/A60/A81 above, so it can never overlap them regardless of how
-    # tall the notes wrap to.
-    if maintenance_notes and maintenance_notes.strip():
-        mv['J4'] = 'MAINTENANCE / IMPROVEMENT ACTIONS THIS MONTH'
-        mv['J4'].font = SECTION_FONT
-        mv['J4'].fill = SECTION_FILL
-        mv.merge_cells('J4:M4')
-        for c in range(10, 14):
-            mv.cell(row=4, column=c).fill = SECTION_FILL
-        mv['J5'] = maintenance_notes.strip()
-        mv['J5'].alignment = Alignment(wrap_text=True, vertical='top')
-        mv.merge_cells('J5:M12')
-        mv.column_dimensions['J'].width = 18
 
     mv.sheet_view.showGridLines = False
     # Landscape + fit-to-width so printing/PDF-exporting this sheet doesn't
