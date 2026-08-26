@@ -65,7 +65,11 @@
   "Apollo": {
     "customer_id": "d81ab2b0-d28f-11f0-acf0-9dc39bd2429d",
     "traps_monitored": 30,
-    "investment": 644000.0
+    "investment": 644000.0,
+    "pressure_bar": 20.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 1500.0,
+    "detect_minutes": 15.0
   },
   "Alkem": {
     "customer_id": "166ab790-d583-11f0-acf0-9dc39bd2429d",
