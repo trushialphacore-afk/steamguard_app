@@ -402,6 +402,22 @@ with step2:
     # residual-loss calc) but is intentionally not shown anywhere in the UI.
     detect_min = assumption_values["detect_minutes"]
 
+# ---------------- Maintenance / improvement actions (optional) ----------------
+step3 = st.container(border=True)
+with step3:
+    st.subheader("🔧 3. Maintenance / improvement actions this month (optional)")
+    st.caption(
+        "Anything the field/plant team fixed or improved this month — e.g. 'Trap #1331 replaced, leak "
+        "resolved' or 'Trap #2205 blockage cleared'. One action per line. Typed fresh each report — this "
+        "is month-specific, so it's not saved for next time like Investment/Traps Monitored are. Leave "
+        "blank if nothing to report — no extra slide/section is added when this is empty."
+    )
+    maintenance_notes = st.text_area(
+        "Maintenance / improvement actions (one per line)",
+        value="", height=100, label_visibility="collapsed",
+        placeholder="e.g.\nTrap #1331 replaced — leak resolved.\nTrap #2205 blockage cleared during routine check.",
+    )
+
 st.write("")
 generate = st.button("⚡ GENERATE REPORT", type="primary", use_container_width=True)
 
@@ -487,10 +503,12 @@ if generate:
                     saved_path, summary = build_report(
                         client_name, csv_path, out_path, final_assumptions,
                         filter_year_month=filter_year_month,
+                        maintenance_notes=maintenance_notes,
                     )
                     build_pptx_report(
                         summary, month_label, pptx_path,
                         investment_confirmed=(investment != DEFAULTS["investment_monthly"]),
+                        maintenance_notes=maintenance_notes,
                     )
 
                     # Persist this client's true trap count, investment, AND
