@@ -264,6 +264,85 @@ with step1:
                     del st.session_state[state_key]
                     st.rerun()
 
+        # ---------------- Search by trap-name keyword ----------------
+        # The count-match approach above fails whenever the number you see
+        # on the dashboard doesn't exactly match any customerId's total for
+        # that month — this has now happened for a few clients (counts
+        # drift, coincide between clients, or the dashboard's shown number
+        # is from a slightly different filter/window). A trap's NAME is far
+        # more stable than a monthly count — every one of a client's traps
+        # usually shares some recognisable text (a plant code, a site name,
+        # part of the client name itself), so matching on that instead is
+        # much more reliable and works even when counts never line up.
+        with st.expander("🔎 Count doesn't match anything? Search by trap name keyword instead (more reliable)"):
+            st.caption(
+                "Type any bit of text you'd expect in this client's trap names — e.g. a plant code, "
+                "site name, or part of the client name (like 'JK' or 'H5'). This searches every trap "
+                "name that raised an alarm this month and groups the matches by Customer ID, so you can "
+                "pick by what the traps are actually called instead of guessing from a count."
+            )
+            kw_col1, kw_col2 = st.columns([0.6, 0.4])
+            with kw_col1:
+                keyword = st.text_input(
+                    "Trap-name keyword", key=f"kw_{client_name}{key_suffix}",
+                )
+            with kw_col2:
+                st.write("")
+                st.write("")
+                kw_search_clicked = st.button(
+                    f"🔎 Search trap names for '{client_name}'", key=f"kwsearch_{client_name}{key_suffix}"
+                )
+
+            kw_state_key = f"kw_matches_{client_name}{key_suffix}"
+            if kw_search_clicked and keyword.strip():
+                with st.spinner(f"Scanning {target_year_month.year}-{target_year_month.month:02d}'s trap "
+                                 f"names for '{keyword}'..."):
+                    try:
+                        all_month_alarms = _cached_fetch_all_alarms(target_year_month.year, target_year_month.month)
+                        kw_lower = keyword.strip().lower()
+                        by_customer = {}
+                        for a in all_month_alarms:
+                            trap_name = str(a.get("originatorName") or a.get("name") or "")
+                            if kw_lower in trap_name.lower():
+                                cid = alphacore_api.alarm_customer_id(a)
+                                entry = by_customer.setdefault(cid, {"count": 0, "sample_names": set()})
+                                entry["count"] += 1
+                                entry["sample_names"].add(trap_name)
+                        ranked_kw = sorted(by_customer.items(), key=lambda x: -x[1]["count"])
+                        st.session_state[kw_state_key] = ranked_kw
+                    except (alphacore_api.AlphacoreAuthError, alphacore_api.AlphacoreApiError) as e:
+                        st.error(f"Couldn't fetch alarms to search trap names: {e}")
+
+            ranked_kw = st.session_state.get(kw_state_key)
+            if ranked_kw is not None:
+                if not ranked_kw:
+                    st.warning(
+                        f"No trap names contained '{keyword}' in {target_year_month.year}-"
+                        f"{target_year_month.month:02d}. Try: a different keyword, a different month "
+                        f"(the one you actually saw the count on the dashboard for), or this client's "
+                        f"traps might not carry a Customer ID at all in the dashboard's data."
+                    )
+                else:
+                    kw_options = ["(select one)"]
+                    for cid, info in ranked_kw:
+                        samples = ", ".join(list(info["sample_names"])[:3])
+                        kw_options.append(f"{info['count']} matching alarms — {cid} — e.g. {samples}")
+                    kw_default = 1 if len(ranked_kw) == 1 else 0
+                    kw_chosen = st.selectbox(
+                        f"Found matches under {len(ranked_kw)} distinct Customer ID(s) for '{keyword}' "
+                        f"— pick the one matching '{client_name}'s real traps",
+                        kw_options, index=kw_default, key=f"kw_select_{client_name}{key_suffix}",
+                    )
+                    if kw_chosen != "(select one)":
+                        kw_chosen_idx = kw_options.index(kw_chosen) - 1
+                        kw_chosen_cid = ranked_kw[kw_chosen_idx][0]
+                        if st.button(f"✅ Save this as {client_name}'s Customer ID",
+                                     key=f"kw_save_{client_name}{key_suffix}"):
+                            clients_store.upsert_client(client_name, customer_id=kw_chosen_cid)
+                            st.success(f"✅ Saved — '{client_name}' will auto-fetch from now on.")
+                            del st.session_state[kw_state_key]
+                            st.rerun()
+
         with st.expander("Or paste a Customer ID directly, if you already have it"):
             new_customer_id = st.text_input(
                 f"Dashboard Customer ID for {client_name}", key=f"cid_manual_{client_name}{key_suffix}"
