@@ -481,6 +481,24 @@ with step2:
     # residual-loss calc) but is intentionally not shown anywhere in the UI.
     detect_min = assumption_values["detect_minutes"]
 
+# ---------------- Installation photo (optional) ----------------
+step3 = st.container(border=True)
+with step3:
+    st.subheader("📸 3. Plant / installation photo (optional)")
+    st.caption(
+        "A photo of the SteamGuard device installed on-site (e.g. mounted on a steam header). If given, "
+        "it's automatically color-corrected (plant photos are usually very red-tinted from paint/lighting) "
+        "and added as its own slide in the PowerPoint, right after the overview. Leave empty and the PPT "
+        "stays exactly as before — no extra slide. Not saved for next time — upload again each month you "
+        "want it included, since the device doesn't move but the file itself isn't kept on the server."
+    )
+    install_photo_file = st.file_uploader(
+        "Installation photo", type=["jpg", "jpeg", "png"], label_visibility="collapsed",
+    )
+    if install_photo_file is not None:
+        st.image(install_photo_file, caption="Preview (the PPT slide will be brightened/de-reddened automatically)",
+                  width=350)
+
 st.write("")
 generate = st.button("⚡ GENERATE REPORT", type="primary", use_container_width=True)
 
@@ -567,9 +585,18 @@ if generate:
                         client_name, csv_path, out_path, final_assumptions,
                         filter_year_month=filter_year_month,
                     )
+
+                    install_photo_path = None
+                    if install_photo_file is not None:
+                        ext = os.path.splitext(install_photo_file.name)[1] or ".jpg"
+                        install_photo_path = os.path.join(tmpdir, f"install_photo{ext}")
+                        with open(install_photo_path, "wb") as f:
+                            f.write(install_photo_file.getbuffer())
+
                     build_pptx_report(
                         summary, month_label, pptx_path,
                         investment_confirmed=(investment != DEFAULTS["investment_monthly"]),
+                        install_photo_path=install_photo_path,
                     )
 
                     # Persist this client's true trap count, investment, AND
