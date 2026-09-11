@@ -215,6 +215,47 @@ def upsert_client(name, customer_id=None, traps_monitored=None, investment=None,
     return entry
 
 
+def save_install_photo(name, photo_bytes):
+    """Saves this client's installation photo (already color-corrected,
+    resized JPEG bytes) as a base64 string INSIDE clients_config.json
+    itself, under 'install_photo_b64' — piggy-backing on the exact same
+    GitHub-sync mechanism as everything else in this store (no separate
+    binary-file sync path to build/maintain/break). A single corrected,
+    reasonably-sized JPEG only adds a small amount to the JSON file, so
+    this stays lightweight even with every client's photo saved."""
+    store = load_store()
+    entry = store.get(name, {})
+    entry["install_photo_b64"] = base64.b64encode(photo_bytes).decode("ascii")
+    store[name] = entry
+    save_store(store)
+
+
+def get_install_photo_bytes(name):
+    """Returns this client's saved installation photo as raw JPEG bytes, or
+    None if none has been saved yet."""
+    entry = get_client(name) or {}
+    b64 = entry.get("install_photo_b64")
+    if not b64:
+        return None
+    try:
+        return base64.b64decode(b64)
+    except Exception:
+        return None
+
+
+def remove_install_photo(name):
+    """Deletes a client's saved installation photo (e.g. to replace it with
+    a better one) without touching anything else saved for that client."""
+    store = load_store()
+    entry = store.get(name)
+    if entry and "install_photo_b64" in entry:
+        del entry["install_photo_b64"]
+        store[name] = entry
+        save_store(store)
+        return True
+    return False
+
+
 def get_saved_roi_assumptions(name):
     """Returns whichever of the 4 ROI-sheet-derived assumptions are already
     saved for this client (dict may be partial/empty). Used by the app to
