@@ -135,24 +135,23 @@ def _cached_fetch_all_alarms(year, month):
     return alphacore_api.fetch_all_alarms_for_month(token, year, month)
 
 
-def _prepare_photo_for_storage(uploaded_file):
-    """Resizes an uploaded installation photo down to a sane max dimension
-    and re-encodes as JPEG, returning bytes ready to save in
-    clients_config.json (as base64, via clients_store.save_install_photo).
-    Deliberately does NOT color-correct here — that's done once, fresh,
-    every time a report is built (see pptx_report._enhance_plant_photo),
-    so this stays a single place that owns that logic. Resizing here just
-    keeps the saved JSON small regardless of how big the original photo is."""
-    from PIL import Image
-    import io
-    im = Image.open(uploaded_file).convert("RGB")
-    max_dim = 1600
-    if max(im.size) > max_dim:
-        ratio = max_dim / max(im.size)
-        im = im.resize((int(im.width * ratio), int(im.height * ratio)))
-    buf = io.BytesIO()
-    im.save(buf, format="JPEG", quality=85)
-    return buf.getvalue()
+INSTALL_PHOTOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "install_photos")
+
+
+def _find_install_photo(client_name):
+    """A client's installation photo, if one exists, is just a plain image
+    file sitting in install_photos/ next to this script — named after the
+    client (install_photos/JK_Tyres.jpg, .jpeg, or .png). No database, no
+    upload step, nothing to click in the app at all: to add or change a
+    photo, add/replace that file in the repo (GitHub) and redeploy — every
+    report for that client picks it up automatically from then on."""
+    if not client_name:
+        return None
+    for ext in (".jpg", ".jpeg", ".png"):
+        candidate = os.path.join(INSTALL_PHOTOS_DIR, f"{client_name}{ext}")
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
 
 def extract_assumptions_from_roi(uploaded_file):
@@ -403,40 +402,15 @@ with step1:
     if use_manual_upload:
         alarm_file = st.file_uploader("This month's alarm export (CSV or Excel)", type=["csv", "xlsx", "xls"])
 
-    # ---------------- Installation photo (fixed per client, like Investment) ----------------
-    # A photo of the installed SteamGuard device — set once per client, not
-    # per month (the device doesn't move), same pattern as Investment/Traps
-    # Monitored/ROI assumptions above. Every report generated for this
-    # client from now on automatically includes it — no re-uploading.
-    if client_name:
-        saved_photo_bytes = clients_store.get_install_photo_bytes(client_name)
-        if saved_photo_bytes:
-            st.caption(f"📸 Using {client_name}'s saved installation photo — it'll be added to every report automatically.")
-            with st.expander("Replace this client's installation photo"):
-                st.image(saved_photo_bytes, width=280, caption="Currently saved")
-                new_photo = st.file_uploader(
-                    "New installation photo", type=["jpg", "jpeg", "png"], key=f"photo_{client_name}"
-                )
-                if new_photo is not None:
-                    enhanced = _prepare_photo_for_storage(new_photo)
-                    clients_store.save_install_photo(client_name, enhanced)
-                    st.success(f"✅ Saved — {client_name}'s new installation photo will be used from now on.")
-                    st.rerun()
-        else:
-            with st.expander(f"📸 Add {client_name or 'new client'}'s installation photo (optional — set once, used on every report after)"):
-                st.caption(
-                    "A photo of the SteamGuard device installed on-site. Automatically brightened/de-reddened "
-                    "(plant photos are usually very red-tinted from paint/lighting) and placed on the overview "
-                    "slide of every future report for this client — upload once here, never again."
-                )
-                new_photo = st.file_uploader(
-                    "Installation photo", type=["jpg", "jpeg", "png"], key=f"photo_{client_name}"
-                )
-                if new_photo is not None:
-                    enhanced = _prepare_photo_for_storage(new_photo)
-                    clients_store.save_install_photo(client_name, enhanced)
-                    st.success(f"✅ Saved — will be added to every report for {client_name} from now on.")
-                    st.rerun()
+    # ---------------- Installation photo ----------------
+    # No upload step anywhere in the app at all — a client's installation
+    # photo, if there is one, lives as a plain image file in the
+    # install_photos/ folder next to this script (named after the client,
+    # e.g. install_photos/JK_Tyres.jpg), committed straight into the
+    # codebase/repo. See _find_install_photo() below — every report for
+    # that client picks it up automatically with zero clicks, forever. To
+    # add or change a client's photo, replace that file in the repo (GitHub)
+    # — nothing to do inside the running app.
 
 # ---------------- ROI + Investment ----------------
 step2 = st.container(border=True)
@@ -623,14 +597,10 @@ if generate:
                         filter_year_month=filter_year_month,
                     )
 
-                    # This client's installation photo (if one was ever saved) is
-                    # pulled in automatically here — nothing to upload each time.
-                    install_photo_path = None
-                    saved_photo_bytes = clients_store.get_install_photo_bytes(client_name)
-                    if saved_photo_bytes:
-                        install_photo_path = os.path.join(tmpdir, "install_photo.jpg")
-                        with open(install_photo_path, "wb") as f:
-                            f.write(saved_photo_bytes)
+                    # This client's installation photo (install_photos/<client>.jpg
+                    # in the repo, if it exists) is picked up automatically here —
+                    # zero clicks, no upload step anywhere.
+                    install_photo_path = _find_install_photo(client_name)
 
                     build_pptx_report(
                         summary, month_label, pptx_path,
