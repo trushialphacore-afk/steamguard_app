@@ -135,6 +135,26 @@ def _cached_fetch_all_alarms(year, month):
     return alphacore_api.fetch_all_alarms_for_month(token, year, month)
 
 
+def _prepare_photo_for_storage(uploaded_file):
+    """Resizes an uploaded installation photo down to a sane max dimension
+    and re-encodes as JPEG, returning bytes ready to save in
+    clients_config.json (as base64, via clients_store.save_install_photo).
+    Deliberately does NOT color-correct here — that's done once, fresh,
+    every time a report is built (see pptx_report._enhance_plant_photo),
+    so this stays a single place that owns that logic. Resizing here just
+    keeps the saved JSON small regardless of how big the original photo is."""
+    from PIL import Image
+    import io
+    im = Image.open(uploaded_file).convert("RGB")
+    max_dim = 1600
+    if max(im.size) > max_dim:
+        ratio = max_dim / max(im.size)
+        im = im.resize((int(im.width * ratio), int(im.height * ratio)))
+    buf = io.BytesIO()
+    im.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
+
+
 def extract_assumptions_from_roi(uploaded_file):
     """Best-effort scan of the uploaded ROI Excel (see report history for
     the two layouts this handles). Never trusted silently — results are
@@ -383,6 +403,41 @@ with step1:
     if use_manual_upload:
         alarm_file = st.file_uploader("This month's alarm export (CSV or Excel)", type=["csv", "xlsx", "xls"])
 
+    # ---------------- Installation photo (fixed per client, like Investment) ----------------
+    # A photo of the installed SteamGuard device — set once per client, not
+    # per month (the device doesn't move), same pattern as Investment/Traps
+    # Monitored/ROI assumptions above. Every report generated for this
+    # client from now on automatically includes it — no re-uploading.
+    if client_name:
+        saved_photo_bytes = clients_store.get_install_photo_bytes(client_name)
+        if saved_photo_bytes:
+            st.caption(f"📸 Using {client_name}'s saved installation photo — it'll be added to every report automatically.")
+            with st.expander("Replace this client's installation photo"):
+                st.image(saved_photo_bytes, width=280, caption="Currently saved")
+                new_photo = st.file_uploader(
+                    "New installation photo", type=["jpg", "jpeg", "png"], key=f"photo_{client_name}"
+                )
+                if new_photo is not None:
+                    enhanced = _prepare_photo_for_storage(new_photo)
+                    clients_store.save_install_photo(client_name, enhanced)
+                    st.success(f"✅ Saved — {client_name}'s new installation photo will be used from now on.")
+                    st.rerun()
+        else:
+            with st.expander(f"📸 Add {client_name or 'new client'}'s installation photo (optional — set once, used on every report after)"):
+                st.caption(
+                    "A photo of the SteamGuard device installed on-site. Automatically brightened/de-reddened "
+                    "(plant photos are usually very red-tinted from paint/lighting) and placed on the overview "
+                    "slide of every future report for this client — upload once here, never again."
+                )
+                new_photo = st.file_uploader(
+                    "Installation photo", type=["jpg", "jpeg", "png"], key=f"photo_{client_name}"
+                )
+                if new_photo is not None:
+                    enhanced = _prepare_photo_for_storage(new_photo)
+                    clients_store.save_install_photo(client_name, enhanced)
+                    st.success(f"✅ Saved — will be added to every report for {client_name} from now on.")
+                    st.rerun()
+
 # ---------------- ROI + Investment ----------------
 step2 = st.container(border=True)
 with step2:
@@ -481,24 +536,6 @@ with step2:
     # residual-loss calc) but is intentionally not shown anywhere in the UI.
     detect_min = assumption_values["detect_minutes"]
 
-# ---------------- Installation photo (optional) ----------------
-step3 = st.container(border=True)
-with step3:
-    st.subheader("📸 3. Plant / installation photo (optional)")
-    st.caption(
-        "A photo of the SteamGuard device installed on-site (e.g. mounted on a steam header). If given, "
-        "it's automatically color-corrected (plant photos are usually very red-tinted from paint/lighting) "
-        "and added as its own slide in the PowerPoint, right after the overview. Leave empty and the PPT "
-        "stays exactly as before — no extra slide. Not saved for next time — upload again each month you "
-        "want it included, since the device doesn't move but the file itself isn't kept on the server."
-    )
-    install_photo_file = st.file_uploader(
-        "Installation photo", type=["jpg", "jpeg", "png"], label_visibility="collapsed",
-    )
-    if install_photo_file is not None:
-        st.image(install_photo_file, caption="Preview (the PPT slide will be brightened/de-reddened automatically)",
-                  width=350)
-
 st.write("")
 generate = st.button("⚡ GENERATE REPORT", type="primary", use_container_width=True)
 
@@ -586,12 +623,14 @@ if generate:
                         filter_year_month=filter_year_month,
                     )
 
+                    # This client's installation photo (if one was ever saved) is
+                    # pulled in automatically here — nothing to upload each time.
                     install_photo_path = None
-                    if install_photo_file is not None:
-                        ext = os.path.splitext(install_photo_file.name)[1] or ".jpg"
-                        install_photo_path = os.path.join(tmpdir, f"install_photo{ext}")
+                    saved_photo_bytes = clients_store.get_install_photo_bytes(client_name)
+                    if saved_photo_bytes:
+                        install_photo_path = os.path.join(tmpdir, "install_photo.jpg")
                         with open(install_photo_path, "wb") as f:
-                            f.write(install_photo_file.getbuffer())
+                            f.write(saved_photo_bytes)
 
                     build_pptx_report(
                         summary, month_label, pptx_path,
