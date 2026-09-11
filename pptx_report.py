@@ -342,41 +342,6 @@ def _enhance_plant_photo(src_path, out_path):
     return out_path
 
 
-def _add_photo_slide(prs, client_name, photo_path, page_no, total_pages, caption=None):
-    """One slide: SteamGuard device photo, centered, with a short caption
-    underneath — used for the 'installation proof' photo, auto
-    color-corrected before being placed (see _enhance_plant_photo)."""
-    from PIL import Image
-    s = _blank_slide(prs)
-    _header(s, 'Installation')
-    _textbox(s, Inches(0.45), Inches(1.45), Inches(12.3), Inches(0.6),
-              f'SteamGuard™ installed at {client_name.replace("_", " ")}', size=24, bold=True, color=CHARCOAL)
-
-    # Fit the photo into a fixed box, centered, preserving aspect ratio —
-    # a plant photo's aspect ratio varies shot to shot, so this can't just
-    # hardcode both width and height like the logo does.
-    box_left, box_top = Inches(1.9), Inches(2.15)
-    box_w, box_h = Inches(9.5), Inches(4.15)
-    with Image.open(photo_path) as im:
-        iw, ih = im.size
-    box_ratio = box_w / box_h
-    img_ratio = iw / ih
-    if img_ratio > box_ratio:
-        pic_w = box_w
-        pic_h = int(box_w / img_ratio)
-    else:
-        pic_h = box_h
-        pic_w = int(box_h * img_ratio)
-    pic_left = box_left + (box_w - pic_w) // 2
-    pic_top = box_top + (box_h - pic_h) // 2
-    s.shapes.add_picture(photo_path, pic_left, pic_top, width=pic_w, height=pic_h)
-
-    _textbox(s, Inches(0.45), Inches(6.45), Inches(12.3), Inches(0.4),
-              caption or 'SteamGuard™ smart steam-trap monitor installed on-site.',
-              size=12, italic=True, color=SAGE_GREY, align=PP_ALIGN.CENTER)
-    _footer(s, client_name, page_no, total_pages)
-
-
 def _fmt_rs(v):
     if v is None:
         return "—"
@@ -400,30 +365,56 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
     install_photo_path: optional path to a plant/installation photo (e.g.
         the SteamGuard device mounted on-site). When given, it's auto
         color-corrected (see _enhance_plant_photo — plant photos are
-        usually very red-tinted from paint/lighting) and inserted as its
-        own slide right after the overview slide. When None, the deck is
-        exactly as before — no extra slide.
+        usually very red-tinted from paint/lighting) and placed in the
+        empty space to the right of the title on the overview slide. When
+        None, that space is simply left empty, same as before this existed.
     """
     client_name = summary['client_name']
-    has_photo = bool(install_photo_path)
     prs = Presentation()
     prs.slide_width = SLIDE_W
     prs.slide_height = SLIDE_H
-    total_pages = 6 if has_photo else 5
-    photo_offset = 1 if has_photo else 0  # every slide after the photo shifts its footer page number by this
+    total_pages = 5
     tile_w, gap = Inches(2.85), Inches(0.25)
 
     # ---------------- Slide 1: Overview / hero stats ----------------
     s1 = _blank_slide(prs)
     _header(s1, 'Monitoring Overview')
-    _textbox(s1, Inches(0.45), Inches(1.45), Inches(11.5), Inches(0.6),
+    # Title/subtitle/description are narrowed from full-width to leave the
+    # top-right corner (roughly x=9.1in to 12.9in) clear for the
+    # installation photo below — narrow enough that wrapped text can never
+    # grow into that corner.
+    _textbox(s1, Inches(0.45), Inches(1.45), Inches(8.4), Inches(0.6),
               f'{client_name.replace("_", " ")} — {month_label}', size=28, bold=True, color=CHARCOAL)
-    _textbox(s1, Inches(0.45), Inches(2.05), Inches(12.3), Inches(0.5),
+    _textbox(s1, Inches(0.45), Inches(2.05), Inches(8.4), Inches(0.5),
               f'SteamGuard™ monthly monitoring summary', size=15, italic=True, color=SAGE_GREY)
-    _textbox(s1, Inches(0.45), Inches(2.55), Inches(12.3), Inches(0.7),
+    _textbox(s1, Inches(0.45), Inches(2.55), Inches(8.4), Inches(0.85),
               f'SteamGuard™ continuously monitored {summary["traps_monitored"]} steam traps at '
               f'{client_name.replace("_", " ")} in {month_label}, flagging {summary["traps_flagged"]} traps with '
               f'leak or block events out of the full installed base.', size=13, color=CHARCOAL)
+
+    if install_photo_path:
+        # Auto color-corrected (see _enhance_plant_photo) and fit into the
+        # top-right box, preserving aspect ratio, centered within it.
+        from PIL import Image
+        enhanced_path = os.path.join(os.path.dirname(out_path), '_install_photo_enhanced.jpg')
+        try:
+            _enhance_plant_photo(install_photo_path, enhanced_path)
+            photo_to_use = enhanced_path
+        except Exception:
+            photo_to_use = install_photo_path  # fall back to the original if enhancement fails for any reason
+        box_left, box_top = Inches(9.1), Inches(1.35)
+        box_w, box_h = Inches(3.8), Inches(2.0)
+        with Image.open(photo_to_use) as im:
+            iw, ih = im.size
+        box_ratio = box_w / box_h
+        img_ratio = iw / ih
+        if img_ratio > box_ratio:
+            pic_w, pic_h = box_w, int(box_w / img_ratio)
+        else:
+            pic_h, pic_w = box_h, int(box_h * img_ratio)
+        pic_left = box_left + (box_w - pic_w) // 2
+        pic_top = box_top + (box_h - pic_h) // 2
+        s1.shapes.add_picture(photo_to_use, pic_left, pic_top, width=pic_w, height=pic_h)
 
     tiles = [
         (str(summary['traps_monitored']), 'steam traps monitored'),
@@ -454,16 +445,6 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
                   size=11, color=SAGE_GREY)
     _footer(s1, client_name, 1, total_pages)
 
-    # ---------------- Slide 1b (optional): Installation photo ----------------
-    if has_photo:
-        enhanced_path = os.path.join(os.path.dirname(out_path), '_install_photo_enhanced.jpg')
-        try:
-            _enhance_plant_photo(install_photo_path, enhanced_path)
-            photo_to_use = enhanced_path
-        except Exception:
-            photo_to_use = install_photo_path  # fall back to the original if enhancement fails for any reason
-        _add_photo_slide(prs, client_name, photo_to_use, 2, total_pages)
-
     # ---------------- Slide 2: Detection & cost impact ----------------
     s2 = _blank_slide(prs)
     _header(s2, 'Detection & Cost Impact')
@@ -493,7 +474,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
 
     _add_cost_impact_chart(s2, Inches(0.45), Inches(5.05), Inches(12.3), Inches(1.9),
                             summary['loss_scenarios'])
-    _footer(s2, client_name, 2 + photo_offset, total_pages)
+    _footer(s2, client_name, 2, total_pages)
 
     # ---------------- Slide 3: ROI / Investment ----------------
     s3 = _blank_slide(prs)
@@ -532,7 +513,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
         _textbox(s3, Inches(0.45), caption_top, Inches(12.3), Inches(0.35),
                   '⚠ Investment figure shown is a placeholder/default — confirm the client\'s actual '
                   'contracted amount before sharing this deck externally.', size=11, color=ALERT_RED)
-    _footer(s3, client_name, 3 + photo_offset, total_pages)
+    _footer(s3, client_name, 3, total_pages)
 
     # ---------------- Slide 4: Recurring problem traps ----------------
     s4a = _blank_slide(prs)
@@ -557,7 +538,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True,
         _textbox(s4a, Inches(0.45), Inches(2.5), Inches(12.3), Inches(0.6),
                   f'No trap logged more than {LEAK_HOURS_THRESHOLD} leak hours this month.',
                   size=14, color=SAGE_GREY)
-    _footer(s4a, client_name, 4 + photo_offset, total_pages)
+    _footer(s4a, client_name, 4, total_pages)
 
     # ---------------- Slide 5: Closing ----------------
     s4 = _blank_slide(prs)
