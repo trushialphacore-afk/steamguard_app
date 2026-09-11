@@ -312,6 +312,71 @@ def _add_trap_table(slide, left, top, width, max_height, trap_rows):
     return gframe
 
 
+def _enhance_plant_photo(src_path, out_path):
+    """
+    Plant photos (e.g. the SteamGuard device mounted on a steam header) are
+    very often shot under strong red/orange plant-paint or sodium lighting,
+    which makes the whole photo look like an intense red-tinted mess in a
+    slide. A plain gray-world white-balance fix (assume the average pixel
+    should be neutral grey) actually makes this WORSE here — most of the
+    frame really is red-painted equipment, not a color-cast problem, so
+    forcing the average to grey pushes it into an ugly cyan/magenta look.
+
+    What actually works: leave the hue alone, cut the saturation down
+    (~45%) so the red stops overwhelming the shot, and raise brightness —
+    same photo, same colors, just readable and not visually "loud" next to
+    the rest of the deck.
+    """
+    from PIL import Image, ImageEnhance
+    import numpy as np
+
+    im = Image.open(src_path).convert('RGB')
+    hsv = im.convert('HSV')
+    h, s, v = hsv.split()
+    s_arr = np.clip(np.asarray(s).astype(np.float32) * 0.55, 0, 255).astype(np.uint8)
+    v_arr = np.clip(np.asarray(v).astype(np.float32) * 1.18 + 12, 0, 255).astype(np.uint8)
+    out = Image.merge('HSV', (h, Image.fromarray(s_arr), Image.fromarray(v_arr))).convert('RGB')
+    out = ImageEnhance.Contrast(out).enhance(1.08)
+    out = ImageEnhance.Sharpness(out).enhance(1.1)
+    out.save(out_path, quality=92)
+    return out_path
+
+
+def _add_photo_slide(prs, client_name, photo_path, page_no, total_pages, caption=None):
+    """One slide: SteamGuard device photo, centered, with a short caption
+    underneath — used for the 'installation proof' photo, auto
+    color-corrected before being placed (see _enhance_plant_photo)."""
+    from PIL import Image
+    s = _blank_slide(prs)
+    _header(s, 'Installation')
+    _textbox(s, Inches(0.45), Inches(1.45), Inches(12.3), Inches(0.6),
+              f'SteamGuard™ installed at {client_name.replace("_", " ")}', size=24, bold=True, color=CHARCOAL)
+
+    # Fit the photo into a fixed box, centered, preserving aspect ratio —
+    # a plant photo's aspect ratio varies shot to shot, so this can't just
+    # hardcode both width and height like the logo does.
+    box_left, box_top = Inches(1.9), Inches(2.15)
+    box_w, box_h = Inches(9.5), Inches(4.15)
+    with Image.open(photo_path) as im:
+        iw, ih = im.size
+    box_ratio = box_w / box_h
+    img_ratio = iw / ih
+    if img_ratio > box_ratio:
+        pic_w = box_w
+        pic_h = int(box_w / img_ratio)
+    else:
+        pic_h = box_h
+        pic_w = int(box_h * img_ratio)
+    pic_left = box_left + (box_w - pic_w) // 2
+    pic_top = box_top + (box_h - pic_h) // 2
+    s.shapes.add_picture(photo_path, pic_left, pic_top, width=pic_w, height=pic_h)
+
+    _textbox(s, Inches(0.45), Inches(6.45), Inches(12.3), Inches(0.4),
+              caption or 'SteamGuard™ smart steam-trap monitor installed on-site.',
+              size=12, italic=True, color=SAGE_GREY, align=PP_ALIGN.CENTER)
+    _footer(s, client_name, page_no, total_pages)
+
+
 def _fmt_rs(v):
     if v is None:
         return "—"
@@ -320,7 +385,7 @@ def _fmt_rs(v):
     return f"₹{v:,.0f}"
 
 
-def build_pptx_report(summary, month_label, out_path, investment_confirmed=True):
+def build_pptx_report(summary, month_label, out_path, investment_confirmed=True, install_photo_path=None):
     """
     summary: the dict returned by report_engine.build_report()'s second
         return value — this function reads it directly, so it always
@@ -332,12 +397,20 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
         placeholder/default rather than a confirmed client value — a
         caption is added to the ROI slide flagging that so a management
         deck never silently shows an unverified number as fact.
+    install_photo_path: optional path to a plant/installation photo (e.g.
+        the SteamGuard device mounted on-site). When given, it's auto
+        color-corrected (see _enhance_plant_photo — plant photos are
+        usually very red-tinted from paint/lighting) and inserted as its
+        own slide right after the overview slide. When None, the deck is
+        exactly as before — no extra slide.
     """
     client_name = summary['client_name']
+    has_photo = bool(install_photo_path)
     prs = Presentation()
     prs.slide_width = SLIDE_W
     prs.slide_height = SLIDE_H
-    total_pages = 5
+    total_pages = 6 if has_photo else 5
+    photo_offset = 1 if has_photo else 0  # every slide after the photo shifts its footer page number by this
     tile_w, gap = Inches(2.85), Inches(0.25)
 
     # ---------------- Slide 1: Overview / hero stats ----------------
@@ -381,6 +454,16 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
                   size=11, color=SAGE_GREY)
     _footer(s1, client_name, 1, total_pages)
 
+    # ---------------- Slide 1b (optional): Installation photo ----------------
+    if has_photo:
+        enhanced_path = os.path.join(os.path.dirname(out_path), '_install_photo_enhanced.jpg')
+        try:
+            _enhance_plant_photo(install_photo_path, enhanced_path)
+            photo_to_use = enhanced_path
+        except Exception:
+            photo_to_use = install_photo_path  # fall back to the original if enhancement fails for any reason
+        _add_photo_slide(prs, client_name, photo_to_use, 2, total_pages)
+
     # ---------------- Slide 2: Detection & cost impact ----------------
     s2 = _blank_slide(prs)
     _header(s2, 'Detection & Cost Impact')
@@ -410,7 +493,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
 
     _add_cost_impact_chart(s2, Inches(0.45), Inches(5.05), Inches(12.3), Inches(1.9),
                             summary['loss_scenarios'])
-    _footer(s2, client_name, 2, total_pages)
+    _footer(s2, client_name, 2 + photo_offset, total_pages)
 
     # ---------------- Slide 3: ROI / Investment ----------------
     s3 = _blank_slide(prs)
@@ -449,7 +532,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
         _textbox(s3, Inches(0.45), caption_top, Inches(12.3), Inches(0.35),
                   '⚠ Investment figure shown is a placeholder/default — confirm the client\'s actual '
                   'contracted amount before sharing this deck externally.', size=11, color=ALERT_RED)
-    _footer(s3, client_name, 3, total_pages)
+    _footer(s3, client_name, 3 + photo_offset, total_pages)
 
     # ---------------- Slide 4: Recurring problem traps ----------------
     s4a = _blank_slide(prs)
@@ -474,7 +557,7 @@ def build_pptx_report(summary, month_label, out_path, investment_confirmed=True)
         _textbox(s4a, Inches(0.45), Inches(2.5), Inches(12.3), Inches(0.6),
                   f'No trap logged more than {LEAK_HOURS_THRESHOLD} leak hours this month.',
                   size=14, color=SAGE_GREY)
-    _footer(s4a, client_name, 4, total_pages)
+    _footer(s4a, client_name, 4 + photo_offset, total_pages)
 
     # ---------------- Slide 5: Closing ----------------
     s4 = _blank_slide(prs)
