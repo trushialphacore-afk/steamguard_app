@@ -111,7 +111,7 @@
     "detect_minutes": 15.0
   },
   "Sudarshan": {
-    "customer_id": "",
+    "customer_id": "3a679bb0-899f-11f1-956d-95128823b24b",
     "traps_monitored": 24,
     "investment": 485200.0,
     "pressure_bar": 6.5,
