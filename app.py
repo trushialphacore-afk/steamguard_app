@@ -102,7 +102,7 @@ FALLBACK_CLIENTS = [
     # which this tool no longer models (investment is one-time-total only).
     "JK_Tyres", "GSP", "BKT", "HIKAL", "Rallis",
     "SRF", "Marico_Jalgaon", "Apollo", "Alkem", "ipca", "Amneal_Matoda",
-    "Amneal_Palli", "CEAT_Bhandup",
+    "Amneal_Palli", "CEAT_Bhandup", "Sudarshan",
 ]
 MONTHS = [datetime.date(2026, m, 1).strftime("%B %Y") for m in range(1, 13)]
 
