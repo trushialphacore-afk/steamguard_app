@@ -131,10 +131,10 @@
   "USV_Daman": {
     "customer_id": "a276eb00-8a82-11f1-956d-95128823b24b",
     "traps_monitored": 5,
-    "investment": 126500,
-    "pressure_bar": 4,
-    "orifice_mm": 3,
-    "cost_per_ton": 5000,
+    "investment": 126500.0,
+    "pressure_bar": 4.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 5000.0,
     "detect_minutes": 15
   }
 }
