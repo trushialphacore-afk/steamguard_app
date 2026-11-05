@@ -122,10 +122,10 @@
   "Amneal_Rajoda": {
     "customer_id": "",
     "traps_monitored": 30,
-    "investment": 741000,
-    "pressure_bar": 8,
-    "orifice_mm": 3,
-    "cost_per_ton": 2500,
+    "investment": 741000.0,
+    "pressure_bar": 8.0,
+    "orifice_mm": 3.0,
+    "cost_per_ton": 2500.0,
     "detect_minutes": 15
   },
   "USV_Daman": {
