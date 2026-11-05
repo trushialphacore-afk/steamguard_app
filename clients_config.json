@@ -129,7 +129,7 @@
     "detect_minutes": 15
   },
   "USV_Daman": {
-    "customer_id": "",
+    "customer_id": "a276eb00-8a82-11f1-956d-95128823b24b",
     "traps_monitored": 5,
     "investment": 126500,
     "pressure_bar": 4,
