@@ -1,5 +1,149 @@
 {
+  "GSP": {
+    "customer_id": "3fe9a6a0-dcd4-11f0-b708-e5039c453036",
+    "traps_monitored": 25,
+    "investment": 564400,
+    "pressure_bar": 10,
+    "orifice_mm": 3,
+    "cost_per_ton": 2200,
+    "detect_minutes": 15
+  },
+  "BKT": {
+    "customer_id": "f0e19830-ba03-11f0-9333-67f47b798878",
+    "traps_monitored": 4,
+    "investment": 92500,
+    "pressure_bar": 13.5,
+    "orifice_mm": 3,
+    "cost_per_ton": 2200,
+    "detect_minutes": 15
+  },
+  "JK_Tyres": {
+    "customer_id": "04df6850-070f-11f1-a045-799393f7b056",
+    "traps_monitored": 14,
+    "investment": 312500,
+    "pressure_bar": 20,
+    "orifice_mm": 3,
+    "cost_per_ton": 1800,
+    "detect_minutes": 15
+  },
+  "HIKAL": {
+    "customer_id": "fae71a20-2845-11f1-bdf6-73915c8eb520",
+    "traps_monitored": 5,
+    "investment": 145500,
+    "pressure_bar": 10,
+    "orifice_mm": 3,
+    "cost_per_ton": 2200,
+    "detect_minutes": 15
+  },
+  "Rallis": {
+    "customer_id": "74ecc170-3715-11f1-ba60-83caa49008ef",
+    "traps_monitored": 4,
+    "investment": 129000,
+    "pressure_bar": 4,
+    "orifice_mm": 3,
+    "cost_per_ton": 2600,
+    "detect_minutes": 15
+  },
+  "SRF": {
+    "customer_id": "b48fd330-9bb0-11f1-956d-95128823b24b",
+    "traps_monitored": 15,
+    "investment": 303500,
+    "pressure_bar": 10,
+    "orifice_mm": 3,
+    "cost_per_ton": 2800,
+    "detect_minutes": 15
+  },
+  "Marico_Jalgaon": {
+    "customer_id": "27adca80-d26b-11f0-b405-934623983d4a",
+    "traps_monitored": 5,
+    "investment": 119000,
+    "pressure_bar": 4,
+    "orifice_mm": 3,
+    "cost_per_ton": 1400,
+    "detect_minutes": 15
+  },
+  "Apollo": {
+    "customer_id": "d81ab2b0-d28f-11f0-acf0-9dc39bd2429d",
+    "traps_monitored": 30,
+    "investment": 644000,
+    "pressure_bar": 20,
+    "orifice_mm": 3,
+    "cost_per_ton": 1500,
+    "detect_minutes": 15
+  },
+  "Alkem": {
+    "customer_id": "166ab790-d583-11f0-acf0-9dc39bd2429d",
+    "traps_monitored": 25,
+    "investment": 478000,
+    "pressure_bar": 8,
+    "orifice_mm": 3,
+    "cost_per_ton": 2400,
+    "detect_minutes": 15
+  },
+  "ipca": {
+    "customer_id": "0b6eaf40-0021-11f1-a045-799393f7b056",
+    "traps_monitored": 10,
+    "investment": 213000,
+    "pressure_bar": 3.5,
+    "orifice_mm": 3,
+    "cost_per_ton": 2000,
+    "detect_minutes": 15
+  },
+  "Amneal_Matoda": {
+    "customer_id": "17bf2510-0588-11f1-a045-799393f7b056",
+    "traps_monitored": 30,
+    "investment": 602000,
+    "pressure_bar": 8,
+    "orifice_mm": 3,
+    "cost_per_ton": 3450,
+    "detect_minutes": 15
+  },
+  "Amneal_Palli": {
+    "customer_id": "2414b160-9c62-11f1-956d-95128823b24b"
+  },
+  "CEAT_Bhandup": {
+    "customer_id": "e67073e0-d681-11f0-acf0-9dc39bd2429d",
+    "traps_monitored": 50,
+    "investment": 979500,
+    "pressure_bar": 17,
+    "orifice_mm": 3,
+    "cost_per_ton": 3300,
+    "detect_minutes": 15
+  },
+  "Sudarshan": {
+    "customer_id": "3a679bb0-899f-11f1-956d-95128823b24b",
+    "traps_monitored": 24,
+    "investment": 485200,
+    "pressure_bar": 6.5,
+    "orifice_mm": 3,
+    "cost_per_ton": 2000,
+    "detect_minutes": 15
+  },
+  "Amneal_Rajoda": {
+    "customer_id": "",
+    "traps_monitored": 30,
+    "investment": 741000,
+    "pressure_bar": 8,
+    "orifice_mm": 3,
+    "cost_per_ton": 2500,
+    "detect_minutes": 15
+  },
+  "USV_Daman": {
+    "customer_id": "",
+    "traps_monitored": 5,
+    "investment": 126500,
+    "pressure_bar": 4,
+    "orifice_mm": 3,
+    "cost_per_ton": 5000,
+    "detect_minutes": 15
+  },
   "CEAT_Ambernath": {
-    "customer_id": "b48fd330-9bb0-11f1-956d-95128823b24b"
+    "customer_id": "",
+    "traps_monitored": 40,
+    "investment": 789500,
+    "pressure_bar": 14,
+    "orifice_mm": 3,
+    "cost_per_ton": 2000,
+    "detect_minutes": 15
   }
 }
