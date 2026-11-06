@@ -138,7 +138,7 @@
     "detect_minutes": 15
   },
   "CEAT_Ambernath": {
-    "customer_id": "",
+    "customer_id": "b48fd330-9bb0-11f1-956d-95128823b24b",
     "traps_monitored": 40,
     "investment": 789500,
     "pressure_bar": 14,
