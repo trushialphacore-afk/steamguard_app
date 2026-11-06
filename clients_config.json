@@ -137,4 +137,13 @@
     "cost_per_ton": 5000.0,
     "detect_minutes": 15
   }
+   "CEAT_Ambernath": {
+    "customer_id": "",
+    "traps_monitored": 40,
+    "investment": 789500,
+    "pressure_bar": 14,
+    "orifice_mm": 3,
+    "cost_per_ton": 2000,
+    "detect_minutes": 15
+  }
 }
